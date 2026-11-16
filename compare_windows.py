@@ -5,7 +5,8 @@ import sys
 
 import numpy as np
 from main import (ROOT, WINDOWS, HISTORY, MODEL_ID, OBJECT, REFERENCE, ERROR_LABEL,
-                  select_window, predict, save_result, load_evaluator, plt)
+                  select_window, predict, save_result, load_evaluator)
+from plotting import plt, NAMES, COLORS
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
     parser.add_argument("--checkpoint", default=MODEL_ID)
     args = parser.parse_args()
     if args.model == "physics" and args.device == "gpu":
-        parser.error("GPU 选项用于 TimesFM，二体/J2 使用 CPU")
+        parser.error("GPU 选项用于 TimesFM，动力学模型使用 CPU")
     print(f"Reference: {REFERENCE}", flush=True)
     data = np.loadtxt(ROOT / "data/orbit.csv", delimiter=",", skiprows=1)
     samples = [select_window(data, n) for n in range(1, WINDOWS + 1)]
@@ -24,9 +25,9 @@ def main():
     rows = []
     for number, sample in enumerate(samples, 1):
         print(f"Window {number}/{WINDOWS}", flush=True)
-        predictions = predict(sample[:HISTORY], evaluator)
+        predictions, past_error = predict(sample[:HISTORY], evaluator)
         output = folder / f"window-{number:02d}"
-        save_result(sample, predictions, number, output, args.device)
+        save_result(sample, predictions, past_error, number, output, args.device)
         with (output / "metrics.csv").open(encoding="utf-8", newline="") as stream:
             rows.extend({"window": number, **row} for row in csv.DictReader(stream))
     summaries = []
@@ -41,9 +42,7 @@ def main():
             "median_window_rms_3d_m": float(np.median(rms)),
             "worst_window_rms_3d_m": float(rms.max()),
             "mean_endpoint_3d_m": float(np.mean(endpoint))})
-        names = {"two_body": "Two-body", "j2": "J2", "timesfm": "TimesFM (original)"}
-        colors = {"two_body": "#d76a13", "j2": "#168568", "timesfm": "#2463a6"}
-        ax.plot(range(1, WINDOWS + 1), rms, "o-", label=names[model], color=colors[model])
+        ax.plot(range(1, WINDOWS + 1), rms, "o-", label=NAMES[model], color=COLORS[model])
     for filename, records in [("by_window.csv", rows), ("summary.csv", summaries)]:
         with (folder / filename).open("w", encoding="utf-8", newline="") as stream:
             writer = csv.DictWriter(stream, fieldnames=list(records[0]))
@@ -52,7 +51,7 @@ def main():
     ax.set(xticks=range(1, WINDOWS + 1), xlabel="Fixed forecast window", yscale="log",
            ylabel="RMS: " + ERROR_LABEL, title=f"{OBJECT} | {args.device.upper()} | {WINDOWS} windows")
     ax.grid(alpha=.2)
-    ax.legend()
+    ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()
     fig.savefig(folder / "comparison.png", dpi=150)
     plt.close(fig)

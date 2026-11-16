@@ -2,9 +2,9 @@
 
 这些文件来自真实运行，没有手工修改预测值或挑选窗口。
 
-- `cpu/`、`gpu/`：分别包含每个固定窗口的 prediction.csv、metrics.csv、run.json、result.png，以及整体 by_window.csv、summary.csv、comparison.png。
+- `cpu/`、`gpu/`：分别包含每个固定窗口的 history.csv、prediction.csv、metrics.csv、run.json、result.png，以及整体 by_window.csv、summary.csv、comparison.png。
 - 根目录 README 展示 GPU 图；CPU 结果保留在这里，数值可能略有不同。
-- 二体/J2 均为 NumPy CPU 计算；CPU/GPU 标签指 TimesFM 的推理设备。
+- 动力学均为 CPU 计算；CPU/GPU 标签指 TimesFM 的推理设备。
 - 不包含模型权重或原始大型数据文件。
 
 ## 实测环境（2026-11-16）
@@ -37,3 +37,11 @@ python compare_windows.py --device gpu
 新结果写入 `outputs/`，不会覆盖本目录。已有官方模型目录时可加 `--checkpoint 路径`，避免重复下载；请自行确认其版本与上述 revision 一致。
 
 基础测试会重新从归档 XYZ 计算三维 RMS，并检查结果与参考数据的时间对齐。CI 运行基础物理模型和结果核算，不重新运行大模型。不要将 CI 通过理解为在云端重新验证了 TimesFM 推理。
+
+## 误差补偿版更新
+
+本目录全部窗口已重新运行，并替换为包含 TimesFM 误差补偿的结果。`history.csv` 记录实际历史输入与残差；`run.json` 记录补偿基线及残差构造方式。直接预测与误差预测共用同一原始模型，没有微调。
+
+本次 CPU/GPU 运行均设置 `OMP_NUM_THREADS=4`、`MKL_NUM_THREADS=4`；设备与线程配置引起的微小浮点差异正常。完整环境以本目录更新后的 environment.json 为准。
+
+本碎片实验使用六份多历元 TLE，以及显式的“历元后 24 h 可用”离线假设；已知最新 TLE 的 SGP4 也作为基线。留后参考不是独立实测真值。此前单 TLE 结果与本次结果不属于同一任务，不能直接比较数值。

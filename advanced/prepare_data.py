@@ -1,48 +1,50 @@
-"""从附带 TLE 生成固定 SGP4 参考轨迹；没有下载、拟合或制造实测真值。"""
+"""六份固定 TLE -> 四组旧/新/留后参考窗口；正常运行无需执行本脚本。"""
 import hashlib
 import json
 from pathlib import Path
+import sys
+from datetime import timedelta
 
 import numpy as np
 import sgp4
-from sgp4.api import Satrec, WGS72
-from sgp4.conveniences import sat_epoch_datetime
-from sgp4.io import verify_checksum, twoline2rv
-from sgp4.earth_gravity import wgs72
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tle import EPOCH, DELAY, load_tles, positions
+
+SOURCE = "https://raw.githubusercontent.com/AleksanderLidtke/ConjunctionDetection/c21596737757d87ea5bd2353c4b128c0795632d0/Release/Covariance%203LEs/33757.txt"
 
 
 def main():
-    source = ROOT / "data/debris.tle"
-    name, line1, line2 = source.read_text(encoding="ascii").splitlines()
-    verify_checksum(line1, line2)
-    twoline2rv(line1, line2, wgs72)  # 严格检查固定列格式，不能把平均根数直接当作二体瞬时根数。
-    satellite = Satrec.twoline2rv(line1, line2, WGS72)
-    seconds = np.arange(0, 25 * 3600 + 1, 60, dtype=np.float64)
-    jd = np.full(len(seconds), satellite.jdsatepoch)
-    fraction = satellite.jdsatepochF + seconds / 86400
-    errors, r_km, v_km_s = satellite.sgp4_array(jd, fraction)
-    if np.any(errors != 0):
-        raise ValueError(f"SGP4 传播失败，错误码 {np.unique(errors)}")
-    data = np.column_stack([seconds, r_km * 1000, v_km_s * 1000])
-    if not np.isfinite(data).all():
-        raise ValueError("SGP4 返回无效数值")
+    records = load_tles()
+    windows, samples = [], []
+    for i in range(1, len(records) - 1):
+        old, recent, held_out = records[i - 1:i + 2]
+        origin = np.ceil(recent["available"] / 60) * 60
+        if held_out["epoch"] <= origin + 3600:
+            raise ValueError("留后 TLE 历元必须晚于本窗口预测结束")
+        times = origin + np.arange(-359, 61) * 60
+        # 在起报时回算最新已知 TLE 的历史；留后 TLE 只生成评分参考。
+        states = np.vstack([positions(recent, times[:360]), positions(held_out, times[360:])])
+        samples.append(np.column_stack([times, states]))
+        windows.append({"number": i, "origin_seconds": float(origin),
+            "origin_utc": (EPOCH + timedelta(seconds=float(origin))).isoformat(),
+            "old_tle_index": i - 1, "recent_tle_index": i, "reference_tle_index": i + 1})
     output = ROOT / "data/orbit.csv"
     with output.open("w", encoding="utf-8", newline="\n") as stream:
-        np.savetxt(stream, data, fmt="%.17g", delimiter=",", comments="",
-            header="seconds_since_tle_epoch,x_m,y_m,z_m,vx_m_s,vy_m_s,vz_m_s")
-    manifest = {"object": name, "norad_id": satellite.satnum,
-        "source_url": "https://celestrak.org/NORAD/elements/gp.php?CATNR=33757&FORMAT=TLE",
-        "snapshot_retrieved_utc_date": "2026-11-16", "tle_epoch_utc": sat_epoch_datetime(satellite).isoformat(),
-        "tle_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        np.savetxt(stream, np.vstack(samples), fmt="%.17g", delimiter=",", comments="",
+            header="seconds_since_2000_utc,x_m,y_m,z_m,vx_m_s,vy_m_s,vz_m_s")
+    manifest = {"object": "COSMOS 2251 DEB", "norad_id": 33757, "source_url": SOURCE,
+        "tle_sha256": hashlib.sha256((ROOT / "data/debris.tle").read_bytes()).hexdigest(),
+        "tle_count": len(records), "tle_epochs_utc": [(EPOCH + timedelta(seconds=r["epoch"])).isoformat() for r in records],
+        "availability_assumption_seconds": DELAY, "availability_is_observed": False,
         "frame": "TEME", "gravity_model": "WGS72", "sgp4_version": sgp4.__version__,
-        "rows": len(data), "sample_seconds": 60, "propagation_hours_after_epoch": [0, 25],
-        "reference_kind": "SGP4 propagated reference, not observed or independently measured ground truth",
-        "history_kind": "Same-TLE SGP4 propagated positions; not historical tracking observations",
+        "rows": sum(len(s) for s in samples), "sample_seconds": 60, "windows": windows,
+        "reference_kind": "Later-epoch TLE/SGP4; not independently measured ground truth",
+        "history_kind": "Latest available TLE propagated over past six hours at forecast origin",
         "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}
     output.with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"Saved {len(data)} SGP4 reference states for NORAD {satellite.satnum}")
+    print(f"Saved {len(records)} TLE epochs, {len(windows)} windows")
 
 
 if __name__ == "__main__":

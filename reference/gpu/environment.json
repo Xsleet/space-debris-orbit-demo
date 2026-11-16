@@ -4,6 +4,8 @@
   "torch": "2.8.0+cu128",
   "cuda_runtime": "12.8",
   "inference_device": "NVIDIA GeForce RTX 5070 Ti",
+  "OMP_NUM_THREADS": "4",
+  "MKL_NUM_THREADS": "4",
   "packages": {
     "Jinja2": "3.1.6",
     "MarkupSafe": "3.0.4",

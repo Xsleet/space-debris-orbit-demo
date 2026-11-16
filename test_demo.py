@@ -54,7 +54,7 @@ class DataTests(unittest.TestCase):
         manifest = json.loads((demo.ROOT / "data/orbit.manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["rows"], len(self.data))
         self.assertEqual(manifest["output_sha256"], hashlib.sha256((demo.ROOT / "data/orbit.csv").read_bytes()).hexdigest())
-        np.testing.assert_array_equal(np.diff(self.data[:, 0]), np.full(len(self.data) - 1, 60))
+        self.assertTrue(np.all(np.diff(self.data[:, 0]) > 0))
         for number in range(1, demo.WINDOWS + 1):
             sample = demo.select_window(self.data, number)
             self.assertEqual(len(sample), 420)
@@ -67,33 +67,47 @@ class DataTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             demo.select_window(sample[::-1], 1)
 
-    def test_tle_checksum_and_sgp4_reference(self):
-        from sgp4.api import Satrec, WGS72
-        from sgp4.io import verify_checksum
+    def test_tle_epochs_and_time_only_selection(self):
+        from tle import load_tles, available_tles, positions
         source = demo.ROOT / "data/debris.tle"
-        name, line1, line2 = source.read_text(encoding="ascii").splitlines()
-        verify_checksum(line1, line2)
         self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), demo.INFO["tle_sha256"])
-        satellite = Satrec.twoline2rv(line1, line2, WGS72)
-        self.assertEqual(satellite.satnum, 33757)
-        self.assertEqual(name, demo.OBJECT)
-        for index in (0, 720, 1500):
-            row = self.data[index]
-            error, position, velocity = satellite.sgp4(satellite.jdsatepoch,
-                satellite.jdsatepochF + row[0] / 86400)
-            self.assertEqual(error, 0)
-            np.testing.assert_allclose(row[1:], np.r_[position, velocity] * 1000, atol=1e-4, rtol=0)
+        records = load_tles()  # 同时验证六份 TLE 的固定列格式和校验和。
+        self.assertEqual(len(records), 6)
+        for number in range(1, demo.WINDOWS + 1):
+            sample = demo.select_window(self.data, number)
+            origin = sample[359, 0]
+            old, latest = available_tles(origin, records)
+            self.assertIs(old, records[number - 1])
+            self.assertIs(latest, records[number])
+            future_record = records[number + 1]
+            self.assertLessEqual(latest["available"], origin)
+            self.assertGreater(future_record["epoch"], origin + 3600)
+            np.testing.assert_allclose(positions(latest, sample[:360, 0]), sample[:360, 1:], atol=1e-6)
+            np.testing.assert_allclose(positions(future_record, sample[360:, 0]), sample[360:, 1:], atol=1e-6)
+            # 把未来 TLE 的轨道内容替换成不可传播对象，不影响起报前选择。
+            future_changed = records[:number + 1] + [{**r, "satellite": None} for r in records[number + 1:]]
+            self.assertEqual(available_tles(origin, future_changed), [old, latest])
+        with self.assertRaises(ValueError):
+            available_tles(records[1]["available"] - 1, records)
 
-    def test_timesfm_receives_only_past_positions_in_km(self):
+    def test_timesfm_inputs_and_additive_correction(self):
         sample = demo.select_window(self.data, 1)
+        inputs_seen = []
         class Evaluator:
             def predict_batch(self, inputs, **kwargs):
-                np.testing.assert_allclose(inputs, ((sample[:360, 1:4] - sample[359, 1:4])/1000).T,
-                                           rtol=1e-6, atol=1e-4)
+                inputs_seen.append(np.array(inputs))
                 assert kwargs["horizon"] == 60
                 return [SimpleNamespace(forecast=np.full(60, 2.)) for _ in range(3)]
-        result = demo.predict(sample[:360], Evaluator())
+        result, residual = demo.predict(sample[:360], Evaluator())
+        self.assertEqual(len(inputs_seen), 2)
+        np.testing.assert_allclose(inputs_seen[0], ((sample[:360, 1:4] - sample[359, 1:4])/1000).T,
+                                   rtol=1e-6, atol=1e-4)
+        np.testing.assert_allclose(inputs_seen[1], (residual - residual[-1]).T, rtol=1e-6, atol=1e-4)
         np.testing.assert_allclose(result["timesfm"], np.tile(sample[359, 1:4] + 2000, (60, 1)))
+        np.testing.assert_allclose(result[demo.HYBRID] - result[demo.BASE],
+                                   np.tile(residual[-1] + 2, (60, 1)), atol=1e-8)
+        with self.assertRaises(ValueError):
+            demo.predict(sample, Evaluator())  # 禁止把含未来参考的 420 点传进预测函数。
 
     def test_archived_metrics_from_xyz_not_plot(self):
         for device in ("cpu", "gpu"):
@@ -107,7 +121,10 @@ class DataTests(unittest.TestCase):
                 reference = np.column_stack([pred[f"reference_{axis}_m"] for axis in "xyz"])
                 np.testing.assert_array_equal(reference, sample[360:, 1:4])
                 with (output / "metrics.csv").open(encoding="utf-8", newline="") as stream:
-                    for row in csv.DictReader(stream):
+                    rows = list(csv.DictReader(stream))
+                    self.assertEqual({r["model"] for r in rows},
+                                     {"two_body", "j2", "sgp4_old", "sgp4_latest", "timesfm", demo.HYBRID})
+                    for row in rows:
                         model = row["model"]
                         xyz = np.column_stack([pred[f"{model}_{axis}_m"] for axis in "xyz"])
                         error = np.sqrt(np.sum((xyz - reference)**2, axis=1))
@@ -116,8 +133,14 @@ class DataTests(unittest.TestCase):
                         self.assertAlmostEqual(rms, float(row["rms_3d_m"]), places=6)
                         self.assertAlmostEqual(error[-1], float(row["endpoint_3d_m"]), places=6)
                         rms_values.setdefault(model, []).append(rms)
+                past = np.genfromtxt(output / "history.csv", delimiter=",", names=True)
+                np.testing.assert_array_equal(past["time_seconds"], sample[:360, 0])
+                for axis, col in zip("xyz", (1, 2, 3)):
+                    np.testing.assert_array_equal(past[f"reference_{axis}_m"], sample[:360, col])
+                    np.testing.assert_allclose(past[f"reference_{axis}_m"] - past[f"baseline_{axis}_m"],
+                                               past[f"residual_{axis}_m"], atol=1e-8)
                 if number == 1:
-                    physics = demo.predict(sample[:360])
+                    physics, residual = demo.predict(sample[:360])
                     for model, xyz in physics.items():
                         archived = np.column_stack([pred[f"{model}_{axis}_m"] for axis in "xyz"])
                         np.testing.assert_allclose(xyz, archived, atol=.001, rtol=0)

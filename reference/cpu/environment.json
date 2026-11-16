@@ -4,6 +4,8 @@
   "torch": "2.8.0+cpu",
   "cuda_runtime": null,
   "inference_device": "CPU",
+  "OMP_NUM_THREADS": "4",
+  "MKL_NUM_THREADS": "4",
   "packages": {
     "Jinja2": "3.1.6",
     "MarkupSafe": "3.0.3",
