@@ -9,10 +9,11 @@ import numpy as np
 
 NAMES = {"two_body": "Two-body", "j2": "J2", "timesfm": "TimesFM: direct XYZ",
          "j2_timesfm": "J2 + TimesFM", "sgp4_old": "SGP4: older TLE",
-         "sgp4_latest": "SGP4: latest known TLE", "sgp4_timesfm": "Older SGP4 + TimesFM"}
+         "sgp4_latest": "SGP4: latest known TLE", "sgp4_timesfm": "Older SGP4 + TimesFM",
+         "elements_linear": "Linear elements + SGP4", "elements_timesfm": "TimesFM elements + SGP4"}
 COLORS = {"two_body": "#c27415", "j2": "#168568", "timesfm": "#3879bf",
           "j2_timesfm": "#b33178", "sgp4_old": "#806b9b", "sgp4_latest": "#345447",
-          "sgp4_timesfm": "#b33178"}
+          "sgp4_timesfm": "#b33178", "elements_linear": "#cb7c26", "elements_timesfm": "#136cb0"}
 
 
 def save_result(sample, predictions, past_error, metadata, output):

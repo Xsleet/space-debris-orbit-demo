@@ -1,0 +1,38 @@
+{
+  "origin": "2013-10-11 02:09:00 UTC",
+  "known_tle_count": 2,
+  "known_tle_epochs": [
+    "2013-10-07 20:07:44 UTC",
+    "2013-10-10 02:08:53 UTC"
+  ],
+  "known_tle_availability": [
+    "2013-10-08 20:07:44 UTC",
+    "2013-10-11 02:08:53 UTC"
+  ],
+  "input_grid_hours": 1,
+  "input_grid_points": 55,
+  "element_extrapolation_hours": 24.001862720284198,
+  "predicted_element_epoch": "2013-10-11 02:09:00 UTC",
+  "bstar_source": "latest known TLE",
+  "phase_handling": "Remove latest mean-motion phase before unwrap; restore after forecast",
+  "linear_baseline": "Least-squares slope over actual known TLEs, anchored at latest TLE",
+  "parameters_at_origin": {
+    "elements_linear": {
+      "mean_motion_rev_day": 14.317537192995983,
+      "eccentricity": 0.0014648898650985824,
+      "inclination_rad": 1.292175844378658,
+      "raan_rad": 2.661853349191855,
+      "arg_perigee_rad": 2.992637930848735,
+      "mean_anomaly_rad": 1.6341748296155245
+    },
+    "elements_timesfm": {
+      "mean_motion_rev_day": 14.317537192995294,
+      "eccentricity": 0.0014648898670937317,
+      "inclination_rad": 1.292175844380421,
+      "raan_rad": 2.661853367278096,
+      "arg_perigee_rad": 2.9926379522805253,
+      "mean_anomaly_rad": 1.6341748286718527
+    }
+  },
+  "caveat": "Only 2-5 actual TLEs per window; hourly interpolation is not new observations"
+}

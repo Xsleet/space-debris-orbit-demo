@@ -4,6 +4,8 @@
 
 **过去 6 小时 → 起报虚线 → 未来 60 分钟**，新增 **动力学＋TimesFM 误差预报**，保留 CPU/GPU。
 
+也可试验 **TimesFM 预测轨道根数 → SGP4**：[实测对比与原理](ELEMENTS_EXPERIMENT.md)。
+
 ## 1. 先理解这三步
 
 本例用三份按历元排列的 TLE：**A（旧）、B（最新已知）、C（留后评分）**。
@@ -16,7 +18,7 @@
 
 **过去轨迹是起报时由 B 回算的参考序列，未来参考由 C 传播，都不是实测真值。** 原始归档没有发布时间，因此明确假设每份 TLE 在“历元后 24 小时”可用；仅在这个假设下作因果回放，不声称复现真实在线发布流程。
 
-先读约 130 行的 [main.py](main.py)，核心是 `predict()`；画图单独放在 [plotting.py](plotting.py)，动力学在 [orbit.py](orbit.py)。**两个 TimesFM 分支使用同一个官方原始模型，没有微调。**
+先读约 130 行的 [main.py](main.py)，核心是 `predict()`；画图单独放在 [plotting.py](plotting.py)，动力学在 [orbit.py](orbit.py)。**全部 TimesFM 分支使用同一个官方原始模型，没有微调。**
 
 ## 2. 下载与运行
 
@@ -106,6 +108,28 @@ python compare_windows.py --device gpu
 给学生的三个问题：补偿在哪些窗口有效？为何直接预测 XYZ 比预测误差困难？补偿旧 TLE 的收益，有多少来自最新 TLE 本身？
 
 数据来源、坐标、时间假设和限制见 [DATA_SOURCES.md](DATA_SOURCES.md)；完整 CPU/GPU 实测结果见 [reference](reference/README.md)。`python -m unittest discover -v` 检查时间边界、误差加回、TLE 选择和归档指标。CI 检查 Windows/Linux、Python 3.11/3.12 的基础流程，不在线下载大模型。
+
+## 5. 预测轨道根数会更好吗？
+
+本次小样本中，**会**。相同 4 个起报窗口、相同未来 60 分钟、相同留后 TLE 评分，实测三维合并 RMS（m）：
+
+| 方法 | CPU | GPU |
+|---|---:|---:|
+| 最新已知 TLE → SGP4 | 362.454 | 362.454 |
+| 旧 SGP4＋TimesFM 误差预报 | 360.902 | 360.902 |
+| 根数线性外推 → SGP4 | 354.956 | 354.956 |
+| **TimesFM 预测根数 → SGP4** | **206.150** | **206.176** |
+
+相对最新已知 TLE 的 SGP4，整段 RMS 降低约 **43.1%**，4 个窗口均改善。但只看第 60 分钟的末端误差，有 2 个窗口变差；不能理解为每个预报时刻都更好。
+
+```bash
+python compare_elements.py --device cpu
+python compare_elements.py --device gpu
+```
+
+安装方式同第 2 节。核心在约 90 行的 [elements.py](elements.py)。输出到 `outputs/elements-cpu/` 或 `outputs/elements-gpu/`，已实测结果在 [reference/elements](reference/elements)。
+
+根数分支使用起报前全部 **2～5 份真实 TLE**，小时插值用于适配 TimesFM，不能算作新增观测；误差分支仍使用 A/B 构造的过去 6 小时序列。**这比较的是两套预报方案，不是只替换输入坐标的受控实验。** 数据只涉及一个碎片，评分参考仍为后续 TLE。[详细协议和每窗结果](ELEMENTS_EXPERIMENT.md)。
 
 自编代码为 MIT；数据和模型遵循各自许可。TimesFM 3.0 权重用于非商业、非生产教学研究，仓库不分发权重，见 [模型许可](https://huggingface.co/google/timesfm-3.0-pytorch/blob/main/LICENSE)。
 

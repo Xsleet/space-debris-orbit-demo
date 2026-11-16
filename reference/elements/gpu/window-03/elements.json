@@ -1,0 +1,42 @@
+{
+  "origin": "2013-10-18 03:27:00 UTC",
+  "known_tle_count": 4,
+  "known_tle_epochs": [
+    "2013-10-07 20:07:44 UTC",
+    "2013-10-10 02:08:53 UTC",
+    "2013-10-14 19:49:41 UTC",
+    "2013-10-17 03:26:00 UTC"
+  ],
+  "known_tle_availability": [
+    "2013-10-08 20:07:44 UTC",
+    "2013-10-11 02:08:53 UTC",
+    "2013-10-15 19:49:41 UTC",
+    "2013-10-18 03:26:00 UTC"
+  ],
+  "input_grid_hours": 1,
+  "input_grid_points": 224,
+  "element_extrapolation_hours": 24.016513439996373,
+  "predicted_element_epoch": "2013-10-18 03:27:00 UTC",
+  "bstar_source": "latest known TLE",
+  "phase_handling": "Remove latest mean-motion phase before unwrap; restore after forecast",
+  "linear_baseline": "Least-squares slope over actual known TLEs, anchored at latest TLE",
+  "parameters_at_origin": {
+    "elements_linear": {
+      "mean_motion_rev_day": 14.317554581659957,
+      "eccentricity": 0.0014369548955443297,
+      "inclination_rad": 1.2921570138794283,
+      "raan_rad": 2.4374050691219775,
+      "arg_perigee_rad": 2.7332958098556874,
+      "mean_anomaly_rad": 1.628804044241896
+    },
+    "elements_timesfm": {
+      "mean_motion_rev_day": 14.317555732601946,
+      "eccentricity": 0.001437173201055412,
+      "inclination_rad": 1.292158254181476,
+      "raan_rad": 2.4374038319627753,
+      "arg_perigee_rad": 2.732875321496063,
+      "mean_anomaly_rad": 1.6292626202718523
+    }
+  },
+  "caveat": "Only 2-5 actual TLEs per window; hourly interpolation is not new observations"
+}

@@ -3,6 +3,7 @@
 这些文件来自真实运行，没有手工修改预测值或挑选窗口。
 
 - `cpu/`、`gpu/`：分别包含每个固定窗口的 history.csv、prediction.csv、metrics.csv、run.json、result.png，以及整体 by_window.csv、summary.csv、comparison.png。
+- `elements/cpu/`、`elements/gpu/`：根数预测实验，包含全部原方法及两种根数方案，额外保存真实 TLE 节点、小时输入、根数预测和六根数初始化参数；说明见 [根数实验](../ELEMENTS_EXPERIMENT.md)。
 - 根目录 README 展示 GPU 图；CPU 结果保留在这里，数值可能略有不同。
 - 动力学均为 CPU 计算；CPU/GPU 标签指 TimesFM 的推理设备。
 - 不包含模型权重或原始大型数据文件。
@@ -32,6 +33,8 @@ CPU 与 GPU 都已使用官方稳定版 PyTorch 2.8.0 实测全部窗口。GPU �
 ```bash
 python compare_windows.py --device cpu
 python compare_windows.py --device gpu
+python compare_elements.py --device cpu
+python compare_elements.py --device gpu
 ```
 
 新结果写入 `outputs/`，不会覆盖本目录。已有官方模型目录时可加 `--checkpoint 路径`，避免重复下载；请自行确认其版本与上述 revision 一致。

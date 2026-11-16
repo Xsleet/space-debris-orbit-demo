@@ -1,0 +1,22 @@
+{
+  "python": "3.12.7",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "device": "cpu",
+  "torch": "2.8.0+cpu",
+  "gpu": null,
+  "threads": 4,
+  "model": "google/timesfm-3.0-pytorch",
+  "revision": "43046b85ec22d584a13f8098c2ed39c889e129c2",
+  "packages": {
+    "numpy": "1.26.4",
+    "matplotlib": "3.8.4",
+    "sgp4": "2.27",
+    "timesfm": "3.0.2"
+  },
+  "source_sha256": {
+    "elements.py": "e87ae454995ba3e2441478678e2e6ba157a08f88548425abd7bf156053445fd6",
+    "compare_elements.py": "a38004554175049402371b882733a17d40686baf8eedfbedfc924b732f04bfd3",
+    "main.py": "1b4e37bd08869ab8489b5b677e0ccecbb43ebf3d8316ce8b791556c5df8f3901",
+    "tle.py": "37b0ecaf7fb27d16bbbd973e759584098a5270f72d5ff87ad4bcea17cc96c4fd"
+  }
+}
