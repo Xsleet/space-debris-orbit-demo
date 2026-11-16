@@ -62,7 +62,7 @@ def make_record(values, epoch, latest):
     return {"satellite": sat, "epoch": epoch}
 
 
-def predict_elements(origin, future, evaluator, records=None):
+def predict_elements(origin, future, evaluator=None, records=None):
     """固定协议：全部已知 TLE → 小时网格 → 起报时六根数 → 未来一小时 SGP4。"""
     known, hours, raw, values, grid, inputs = prepare_history(origin, records)
     latest = known[-1]
@@ -71,19 +71,21 @@ def predict_elements(origin, future, evaluator, records=None):
     # 线性基线锚定最新记录，用真实 TLE 节点拟合，不使用插值点伪造样本数。
     slope = hours @ (values - values[-1]) / (hours @ hours)
     linear = values[-1] + target_hour * slope
+    params = {"elements_linear": restore_parameters(linear, target_hour, latest)}
+    forecast = None
     # 各根数独立预测；在 float64 中去末值并缩放，保护很小的根数变化。
-    scale = np.maximum(np.std(inputs, axis=0), 1e-12)
-    centered = ((inputs - inputs[-1]) / scale).T.astype(np.float32)
-    outputs = list(evaluator.predict_batch(list(centered), horizon=steps,
-        return_quantiles=False, make_positive=False, use_symmetric_averaging=False))
-    forecast = np.stack([o.forecast for o in outputs], axis=1).astype(float)
-    if forecast.shape != (steps, 6) or not np.isfinite(forecast).all():
-        raise ValueError("TimesFM 未返回有效的六根数序列")
-    forecast = np.vstack([inputs[-1], forecast * scale + inputs[-1]])
-    predicted = np.array([np.interp(target_hour, np.arange(steps + 1), y)
-                          for y in forecast.T])
-    params = {"elements_linear": restore_parameters(linear, target_hour, latest),
-              "elements_timesfm": restore_parameters(predicted, target_hour, latest)}
+    if evaluator is not None:
+        scale = np.maximum(np.std(inputs, axis=0), 1e-12)
+        centered = ((inputs - inputs[-1]) / scale).T.astype(np.float32)
+        outputs = list(evaluator.predict_batch(list(centered), horizon=steps,
+            return_quantiles=False, make_positive=False, use_symmetric_averaging=False))
+        forecast = np.stack([o.forecast for o in outputs], axis=1).astype(float)
+        if forecast.shape != (steps, 6) or not np.isfinite(forecast).all():
+            raise ValueError("TimesFM 未返回有效的六根数序列")
+        forecast = np.vstack([inputs[-1], forecast * scale + inputs[-1]])
+        predicted = np.array([np.interp(target_hour, np.arange(steps + 1), y)
+                              for y in forecast.T])
+        params["elements_timesfm"] = restore_parameters(predicted, target_hour, latest)
     result = {name: positions(make_record(p, origin, latest), future)[:, :3]
               for name, p in params.items()}
     audit = {"known": known, "hours": hours, "raw": raw, "values": values,

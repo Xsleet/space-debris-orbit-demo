@@ -4,21 +4,27 @@
   "origin": "2013-10-11 02:09:00 UTC",
   "frame": "TEME",
   "reference": "Held-out later TLE",
-  "error_label": "3-D deviation from later TLE (m)",
   "device": "cpu",
-  "history_points": 360,
+  "models": [
+    "sgp4_latest",
+    "elements_linear",
+    "elements_timesfm"
+  ],
+  "display_history_points": 360,
+  "display_history_kind": "Latest known TLE/SGP4 past arc; display only, not model input",
   "horizon_points": 60,
   "step_seconds": 60,
   "timesfm_revision": "43046b85ec22d584a13f8098c2ed39c889e129c2",
-  "residual_baseline": "sgp4_old",
-  "hybrid_model": "sgp4_timesfm",
-  "timesfm_input": "Independent XYZ (km) and residual XYZ (m), last-value centered; no fine-tuning",
-  "residual_construction": "Latest known TLE minus older TLE on past arc; both available by assumed epoch + 24 h",
+  "model_input": "Six TLE mean elements on hourly grid; see element_input.csv; no fine-tuning",
+  "known_tle_count": 2,
   "tle_window": {
     "number": 1,
     "origin_seconds": 434772540.0,
     "origin_utc": "2013-10-11T02:09:00+00:00",
-    "old_tle_index": 0,
+    "known_tle_indices": [
+      0,
+      1
+    ],
     "recent_tle_index": 1,
     "reference_tle_index": 2
   },

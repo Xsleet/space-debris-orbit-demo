@@ -2,21 +2,27 @@
   "python": "3.12.7",
   "platform": "Windows-11-10.0.26300-SP0",
   "device": "gpu",
+  "models": [
+    "sgp4_latest",
+    "elements_linear",
+    "elements_timesfm"
+  ],
+  "model": "google/timesfm-3.0-pytorch",
+  "revision": "43046b85ec22d584a13f8098c2ed39c889e129c2",
+  "source_sha256": {
+    "elements.py": "5ccd02fa672122a86921fd50079958e5bbd0e11c9218037d1fae006e39aed795",
+    "compare_elements.py": "f67fb028429b091f5f6a0f8f3d59c3c389dc87e8f12c44d6ad2fddeffb0ef7a5",
+    "main.py": "27a5b31404e9d403418eb93e1438e75f319766dcf68a9eaca64f7bb0d2754ab4",
+    "plotting.py": "752e5ed48c3f9ffcb4b958dfa3e605dffaff1e4be35c526035ef81d2819a7818",
+    "tle.py": "6b831916bb4573227b7e5cdae1524aa9204e8e58ff23006aca09d9cb176cc0f5"
+  },
   "torch": "2.8.0+cu128",
   "gpu": "NVIDIA GeForce RTX 5070 Ti",
   "threads": 4,
-  "model": "google/timesfm-3.0-pytorch",
-  "revision": "43046b85ec22d584a13f8098c2ed39c889e129c2",
   "packages": {
     "numpy": "1.26.4",
     "matplotlib": "3.8.4",
     "sgp4": "2.27",
     "timesfm": "3.0.2"
-  },
-  "source_sha256": {
-    "elements.py": "e87ae454995ba3e2441478678e2e6ba157a08f88548425abd7bf156053445fd6",
-    "compare_elements.py": "a38004554175049402371b882733a17d40686baf8eedfbedfc924b732f04bfd3",
-    "main.py": "1b4e37bd08869ab8489b5b677e0ccecbb43ebf3d8316ce8b791556c5df8f3901",
-    "tle.py": "37b0ecaf7fb27d16bbbd973e759584098a5270f72d5ff87ad4bcea17cc96c4fd"
   }
 }

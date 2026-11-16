@@ -1,4 +1,4 @@
-"""空间碎片轨道预测：多历元 TLE、SGP4 和 TimesFM 误差补偿。"""
+"""空间碎片轨道根数预测：历史 TLE → 六根数 → SGP4 预报一小时。"""
 import argparse
 from datetime import timedelta
 import json
@@ -6,22 +6,15 @@ from pathlib import Path
 import sys
 
 import numpy as np
+from elements import predict_elements
 from plotting import save_result as write_result
-
-from orbit import propagate
-from tle import EPOCH, available_tles, positions
+from tle import EPOCH, positions
 
 ROOT = Path(__file__).resolve().parent
 HISTORY, HORIZON, STEP = 360, 60, 60
 WINDOWS = 4
-ROTATING = False
-FRAME = "TEME"
 INFO = json.loads((ROOT / "data/orbit.manifest.json").read_text(encoding="utf-8"))
 OBJECT = INFO["object"]
-REFERENCE = "Held-out later TLE"
-ERROR_LABEL = "3-D deviation from later TLE (m)"
-BASE, HYBRID = "sgp4_old", "sgp4_timesfm"
-RESIDUAL_CONSTRUCTION = "Latest known TLE minus older TLE on past arc; both available by assumed epoch + 24 h"
 MODEL_ID = "google/timesfm-3.0-pytorch"
 REVISION = "43046b85ec22d584a13f8098c2ed39c889e129c2"
 
@@ -47,45 +40,26 @@ def select_window(data, number):
     return sample
 
 
-def forecast_xyz(values, evaluator, scale):
-    """三个轴独立预测；位置以 km 输入，误差以 m 输入，均先减末值。"""
-    last = values[-1]
-    inputs = ((values - last) / scale).T.astype(np.float32)
-    outputs = list(evaluator.predict_batch(list(inputs), horizon=HORIZON,
-        return_quantiles=False, make_positive=False, use_symmetric_averaging=False))
-    return np.stack([out.forecast for out in outputs], axis=1).astype(np.float64) * scale + last
+def predict(origin, evaluator=None):
+    """只接收起报时刻；实际输入为已知 TLE 根数，不接收未来参考位置。"""
+    future = origin + np.arange(1, HORIZON + 1) * STEP
+    predictions, audit = predict_elements(origin, future, evaluator)
+    latest = audit["known"][-1]
+    return {"sgp4_latest": positions(latest, future)[:, :3], **predictions}, audit
 
 
-def predict(history, evaluator=None):
-    """只接收过去 360 点；误差预测加回同一条动力学轨道，没有微调。"""
-    if history.shape != (HISTORY, 7) or not np.isfinite(history).all():
-        raise ValueError("预测只接受完整的 360 点历史，不接收未来参考")
-    result = {"two_body": propagate(history[-1, 1:7], HORIZON, STEP, False, ROTATING)[:, :3],
-              "j2": propagate(history[-1, 1:7], HORIZON, STEP, True, ROTATING)[:, :3]}
-    old, latest = available_tles(history[-1, 0])
-    future = history[-1, 0] + np.arange(1, HORIZON + 1) * STEP
-    past_base = positions(old, history[:, 0])[:, :3]
-    result["sgp4_old"] = positions(old, future)[:, :3]
-    result["sgp4_latest"] = positions(latest, future)[:, :3]  # 必须保留最新已知 TLE 基线。
-    past_error = history[:, 1:4] - past_base
-    if evaluator is not None:
-        result["timesfm"] = forecast_xyz(history[:, 1:4], evaluator, scale=1000)
-        result[HYBRID] = result[BASE] + forecast_xyz(past_error, evaluator, scale=1)
-    if any(values.shape != (HORIZON, 3) or not np.isfinite(values).all() for values in result.values()):
-        raise ValueError("模型未返回完整、有效的 XYZ 预测")
-    return result, past_error
-
-
-def save_result(sample, predictions, past_error, number, output, device):
+def save_result(sample, predictions, audit, number, output, device):
     metadata = {"window": number, "object": OBJECT, "origin": time_label(sample[HISTORY - 1, 0]),
-        "frame": FRAME, "reference": REFERENCE, "error_label": ERROR_LABEL, "device": device,
-        "history_points": HISTORY, "horizon_points": HORIZON, "step_seconds": STEP,
-        "timesfm_revision": REVISION, "residual_baseline": BASE, "hybrid_model": HYBRID,
-        "timesfm_input": "Independent XYZ (km) and residual XYZ (m), last-value centered; no fine-tuning",
-        "residual_construction": RESIDUAL_CONSTRUCTION}
-    metadata["tle_window"] = INFO["windows"][number - 1]
-    metadata["availability_assumption_seconds"] = INFO["availability_assumption_seconds"]
-    write_result(sample, predictions, past_error, metadata, output)
+        "frame": "TEME", "reference": "Held-out later TLE", "device": device,
+        "models": list(predictions), "display_history_points": HISTORY,
+        "display_history_kind": "Latest known TLE/SGP4 past arc; display only, not model input",
+        "horizon_points": HORIZON, "step_seconds": STEP,
+        "timesfm_revision": REVISION if "elements_timesfm" in predictions else None,
+        "model_input": "Six TLE mean elements on hourly grid; see element_input.csv; no fine-tuning",
+        "known_tle_count": len(audit["known"]),
+        "tle_window": INFO["windows"][number - 1],
+        "availability_assumption_seconds": INFO["availability_assumption_seconds"]}
+    write_result(sample, predictions, audit, metadata, output)
 
 
 def load_evaluator(device, checkpoint):
@@ -101,24 +75,20 @@ def load_evaluator(device, checkpoint):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
-    parser.add_argument("--model", choices=["timesfm", "physics"], default="timesfm")
+    parser.add_argument("--model", choices=["timesfm", "linear"], default="timesfm")
     parser.add_argument("--window", type=int, choices=range(1, WINDOWS + 1), default=1)
     parser.add_argument("--checkpoint", default=MODEL_ID)
     args = parser.parse_args()
-    if args.model == "physics" and args.device == "gpu":
-        parser.error("动力学模型使用 CPU；GPU 选项用于 TimesFM")
-    print("多历元 TLE 离线回放；评分参考为留后的较晚 TLE，不是实测真值。", flush=True)
+    if args.model == "linear" and args.device == "gpu":
+        parser.error("线性根数与 SGP4 使用 CPU；GPU 选项用于 TimesFM")
+    print("历史 TLE 根数预报；评分参考为留后的较晚 TLE，不是实测真值。", flush=True)
     data = np.loadtxt(ROOT / "data/orbit.csv", delimiter=",", skiprows=1)
-    try:
-        sample = select_window(data, args.window)
-    except ValueError as error:
-        parser.error(str(error))
-    evaluator = None
-    if args.model == "timesfm":
-        evaluator = load_evaluator(args.device, args.checkpoint)
-    predictions, past_error = predict(sample[:HISTORY], evaluator)
-    output = ROOT / "outputs" / f"{args.model}-{args.device}" / f"window-{args.window:02d}"
-    save_result(sample, predictions, past_error, args.window, output, args.device)
+    sample = select_window(data, args.window)
+    evaluator = load_evaluator(args.device, args.checkpoint) if args.model == "timesfm" else None
+    predictions, audit = predict(sample[HISTORY - 1, 0], evaluator)
+    mode = "elements" if evaluator is not None else "linear"
+    output = ROOT / "outputs" / f"{mode}-{args.device}" / f"window-{args.window:02d}"
+    save_result(sample, predictions, audit, args.window, output, args.device)
     print(f"结果：{output}")
 
 

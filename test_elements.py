@@ -120,7 +120,19 @@ class ArchivedElementTests(unittest.TestCase):
                 np.testing.assert_array_equal(reference, sample[360:, 1:4])
                 with (output / "metrics.csv").open(newline="") as stream:
                     metrics = list(csv.DictReader(stream))
-                self.assertEqual(len(metrics), 8)
+                models = {"sgp4_latest", "elements_linear", "elements_timesfm"}
+                self.assertEqual({r["model"] for r in metrics}, models)
+                expected_columns = {"time_seconds", *[f"reference_{c}_m" for c in "xyz"]}
+                for model in models:
+                    expected_columns.update([f"{model}_{c}_m" for c in "xyz"] + [f"{model}_deviation_m"])
+                self.assertEqual(set(predictions.dtype.names), expected_columns)
+                run = json.loads((output / "run.json").read_text())
+                self.assertEqual(set(run["models"]), models)
+                past = np.genfromtxt(output / "history.csv", delimiter=",", names=True)
+                self.assertEqual(past.dtype.names, ("time_seconds", "sgp4_x_m", "sgp4_y_m", "sgp4_z_m"))
+                np.testing.assert_array_equal(past["time_seconds"], sample[:360, 0])
+                for axis, column in zip("xyz", (1, 2, 3)):
+                    np.testing.assert_array_equal(past[f"sgp4_{axis}_m"], sample[:360, column])
                 for row in metrics:
                     model = row["model"]
                     xyz = np.column_stack([predictions[f"{model}_{c}_m"] for c in "xyz"])

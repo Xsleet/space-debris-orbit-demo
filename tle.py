@@ -32,15 +32,6 @@ def load_tles(path=None):
     return records
 
 
-def available_tles(origin, records=None):
-    """预测端只使用已到假设可用时间的记录；不能把历元直接当发布时间。"""
-    records = load_tles() if records is None else records
-    past = [record for record in records if record["available"] <= origin]
-    if len(past) < 2:
-        raise ValueError("起报前至少需要两份可用 TLE")
-    return past[-2:]
-
-
 def positions(record, seconds):
     seconds = np.asarray(seconds, dtype=float)
     days = np.floor(seconds / 86400)

@@ -1,50 +1,40 @@
-# 已实测的 CPU/GPU 结果
+# 根数预测的 CPU/GPU 实测结果
 
-这些文件来自真实运行，没有手工修改预测值或挑选窗口。
+仅保留三种方法：**最新 TLE＋SGP4、根数线性外推＋SGP4、TimesFM 根数预测＋SGP4**。
 
-- `cpu/`、`gpu/`：分别包含每个固定窗口的 history.csv、prediction.csv、metrics.csv、run.json、result.png，以及整体 by_window.csv、summary.csv、comparison.png。
-- `elements/cpu/`、`elements/gpu/`：根数预测实验，包含全部原方法及两种根数方案，额外保存真实 TLE 节点、小时输入、根数预测和六根数初始化参数；说明见 [根数实验](../ELEMENTS_EXPERIMENT.md)。
-- 根目录 README 展示 GPU 图；CPU 结果保留在这里，数值可能略有不同。
-- 动力学均为 CPU 计算；CPU/GPU 标签指 TimesFM 的推理设备。
-- 不包含模型权重或原始大型数据文件。
+- [elements/cpu](elements/cpu/) 与 [elements/gpu](elements/gpu/)：各有四个固定窗口，以及整体 `by_window.csv`、`summary.csv`、`comparison.png`。
+- 每窗保存根数输入、根数预测、三种方法的 XYZ、指标、运行说明和图。
+- `history.csv` 是仅用于显示的过去 SGP4 轨迹；真正模型输入见 `element_input.csv`。
+- 全部结果来自真实运行，未挑选窗口。CPU/GPU 指 TimesFM 推理设备，SGP4 均在 CPU 计算。
 
 ## 实测环境（2026-11-16）
 
 | 项目 | CPU | GPU |
 |---|---|---|
-| 系统 | Windows | Windows |
-| Python | 3.12.7 | 3.12.7 |
+| 系统 / Python | Windows / 3.12.7 | Windows / 3.12.7 |
 | PyTorch | 2.8.0+cpu | 2.8.0+cu128 |
 | GPU | 不使用 | NVIDIA GeForce RTX 5070 Ti |
-| NumPy / Matplotlib | 1.26.4 / 3.8.4 | 1.26.4 / 3.8.4 |
+| NumPy / Matplotlib / SGP4 | 1.26.4 / 3.8.4 / 2.27 | 1.26.4 / 3.8.4 / 2.27 |
 | TimesFM 包 | 3.0.2 | 3.0.2 |
 
-CPU 与 GPU 都已使用官方稳定版 PyTorch 2.8.0 实测全部窗口。GPU 在独立环境中重新安装验证；TimesFM 使用上述固定提交的源码。完整包版本记录在各设备目录的 environment.json，跨设备不要求浮点结果逐位一致。
-
-- 上游源码提交：`e51928e27119cb17bebc005be2696b75e0a9e688`。
 - 模型：`google/timesfm-3.0-pytorch`，未微调。
-- 模型 revision：`43046b85ec22d584a13f8098c2ed39c889e129c2`。
-- 模型权重 SHA-256：`a7592b0a8432baee54483254e5647856911ce69e09d09a9bb65904b2d98f17da`。
-- per_core_batch_size=1；make_positive=False；use_symmetric_averaging=False；return_quantiles=False。
-- 数据及其哈希见上一级 `data/orbit.manifest.json`。
+- 源码提交：`e51928e27119cb17bebc005be2696b75e0a9e688`。
+- 权重 revision：`43046b85ec22d584a13f8098c2ed39c889e129c2`。
+- 权重 SHA-256：`a7592b0a8432baee54483254e5647856911ce69e09d09a9bb65904b2d98f17da`。
+- `OMP_NUM_THREADS=4`、`MKL_NUM_THREADS=4`、`per_core_batch_size=1`。
+- `make_positive=False`、`use_symmetric_averaging=False`、`return_quantiles=False`。
 
-复现命令：
+各设备目录的 `environment.json` 记录实际环境及运行代码指纹。跨设备不要求浮点结果逐位一致。
+
+## 复现
 
 ```bash
-python compare_windows.py --device cpu
-python compare_windows.py --device gpu
 python compare_elements.py --device cpu
 python compare_elements.py --device gpu
 ```
 
-新结果写入 `outputs/`，不会覆盖本目录。已有官方模型目录时可加 `--checkpoint 路径`，避免重复下载；请自行确认其版本与上述 revision 一致。
+新结果写入 `outputs/elements-cpu/` 或 `outputs/elements-gpu/`，不会覆盖归档。已有模型目录可加 `--checkpoint 路径`，请确认权重版本一致。
 
-基础测试会重新从归档 XYZ 计算三维 RMS，并检查结果与参考数据的时间对齐。CI 运行基础物理模型和结果核算，不重新运行大模型。不要将 CI 通过理解为在云端重新验证了 TimesFM 推理。
+基础测试会从归档 XYZ 重算指标、从预测根数重建轨道，并验证历史输入与时间边界。CI 检查 Windows/Linux 的基线流程和结果核算，不在云端重跑大模型。
 
-## 误差补偿版更新
-
-本目录全部窗口已重新运行，并替换为包含 TimesFM 误差补偿的结果。`history.csv` 记录实际历史输入与残差；`run.json` 记录补偿基线及残差构造方式。直接预测与误差预测共用同一原始模型，没有微调。
-
-本次 CPU/GPU 运行均设置 `OMP_NUM_THREADS=4`、`MKL_NUM_THREADS=4`；设备与线程配置引起的微小浮点差异正常。完整环境以本目录更新后的 environment.json 为准。
-
-本碎片实验使用六份多历元 TLE，以及显式的“历元后 24 h 可用”离线假设；已知最新 TLE 的 SGP4 也作为基线。留后参考不是独立实测真值。此前单 TLE 结果与本次结果不属于同一任务，不能直接比较数值。
+[根数原理与逐窗结果](../ELEMENTS_EXPERIMENT.md) · [数据和评价约定](../DATA_SOURCES.md)

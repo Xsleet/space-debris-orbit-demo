@@ -1,4 +1,4 @@
-"""六份固定 TLE -> 四组旧/新/留后参考窗口；正常运行无需执行本脚本。"""
+"""六份固定 TLE -> 四组历史/留后参考窗口；正常运行无需执行本脚本。"""
 import hashlib
 import json
 from pathlib import Path
@@ -19,7 +19,7 @@ def main():
     records = load_tles()
     windows, samples = [], []
     for i in range(1, len(records) - 1):
-        old, recent, held_out = records[i - 1:i + 2]
+        recent, held_out = records[i:i + 2]
         origin = np.ceil(recent["available"] / 60) * 60
         if held_out["epoch"] <= origin + 3600:
             raise ValueError("留后 TLE 历元必须晚于本窗口预测结束")
@@ -29,7 +29,7 @@ def main():
         samples.append(np.column_stack([times, states]))
         windows.append({"number": i, "origin_seconds": float(origin),
             "origin_utc": (EPOCH + timedelta(seconds=float(origin))).isoformat(),
-            "old_tle_index": i - 1, "recent_tle_index": i, "reference_tle_index": i + 1})
+            "known_tle_indices": list(range(i + 1)), "recent_tle_index": i, "reference_tle_index": i + 1})
     output = ROOT / "data/orbit.csv"
     with output.open("w", encoding="utf-8", newline="\n") as stream:
         np.savetxt(stream, np.vstack(samples), fmt="%.17g", delimiter=",", comments="",
@@ -41,7 +41,7 @@ def main():
         "frame": "TEME", "gravity_model": "WGS72", "sgp4_version": sgp4.__version__,
         "rows": sum(len(s) for s in samples), "sample_seconds": 60, "windows": windows,
         "reference_kind": "Later-epoch TLE/SGP4; not independently measured ground truth",
-        "history_kind": "Latest available TLE propagated over past six hours at forecast origin",
+        "history_kind": "Display only: latest known TLE propagated over past six hours; model input is historical TLE elements",
         "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}
     output.with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"Saved {len(records)} TLE epochs, {len(windows)} windows")
