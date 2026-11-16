@@ -13,12 +13,12 @@
 |---|---|---|
 | 系统 | Windows | Windows |
 | Python | 3.12.7 | 3.12.7 |
-| PyTorch | 2.8.0+cpu | 2.8.0.dev20250408+cu128 |
+| PyTorch | 2.8.0+cpu | 2.8.0+cu128 |
 | GPU | 不使用 | NVIDIA GeForce RTX 5070 Ti |
 | NumPy / Matplotlib | 1.26.4 / 3.8.4 | 1.26.4 / 3.8.4 |
 | TimesFM 包 | 3.0.2 | 3.0.2 |
 
-GPU 实测沿用本机已有的 CUDA 开发构建；新安装的 README 命令使用官方稳定版 PyTorch 2.8.0。该稳定版 GPU 安装组合未在本机另建环境测试，不要求与归档浮点结果逐位一致。
+CPU 与 GPU 都已使用官方稳定版 PyTorch 2.8.0 实测全部窗口。GPU 在独立环境中重新安装验证；TimesFM 使用上述固定提交的源码。完整包版本记录在各设备目录的 environment.json，跨设备不要求浮点结果逐位一致。
 
 - 上游源码提交：`e51928e27119cb17bebc005be2696b75e0a9e688`。
 - 模型：`google/timesfm-3.0-pytorch`，未微调。
