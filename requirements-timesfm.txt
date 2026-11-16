@@ -1,0 +1,6 @@
+-r requirements.txt
+huggingface-hub==0.36.2
+safetensors==0.8.0
+# Install torch separately for your CPU/CUDA platform; see README.
+# Pin source API to the version used by the reference experiment.
+timesfm @ git+https://github.com/google-research/timesfm.git@e51928e27119cb17bebc005be2696b75e0a9e688

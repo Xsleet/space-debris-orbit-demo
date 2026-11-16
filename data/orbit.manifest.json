@@ -1,0 +1,20 @@
+{
+  "object": "COSMOS 2251 DEB",
+  "norad_id": 33757,
+  "source_url": "https://celestrak.org/NORAD/elements/gp.php?CATNR=33757&FORMAT=TLE",
+  "snapshot_retrieved_utc_date": "2026-11-16",
+  "tle_epoch_utc": "2026-11-15T17:52:35.014079+00:00",
+  "tle_sha256": "76434e77c35871f118d01069a948a7c4c01ac605a0c76604914dbc5370e3bf99",
+  "frame": "TEME",
+  "gravity_model": "WGS72",
+  "sgp4_version": "2.27",
+  "rows": 1501,
+  "sample_seconds": 60,
+  "propagation_hours_after_epoch": [
+    0,
+    25
+  ],
+  "reference_kind": "SGP4 propagated reference, not observed or independently measured ground truth",
+  "history_kind": "Same-TLE SGP4 propagated positions; not historical tracking observations",
+  "output_sha256": "a84299e04e43df512bf57a118d374fb271facf8cca35f4e8d0fd78a1e58b2f21"
+}

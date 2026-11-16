@@ -1,0 +1,12 @@
+{
+  "window": 1,
+  "origin": "2026-11-15 23:52:35 UTC",
+  "frame": "TEME",
+  "reference": "SGP4 reference (not observations)",
+  "device": "cpu",
+  "history_points": 360,
+  "horizon_points": 60,
+  "step_seconds": 60,
+  "timesfm_revision": "43046b85ec22d584a13f8098c2ed39c889e129c2",
+  "timesfm_input": "Independent XYZ positions, last-value centered in km; no fine-tuning"
+}
